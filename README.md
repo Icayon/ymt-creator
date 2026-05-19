@@ -112,7 +112,7 @@ The output will be a single `YMTCreator.exe` in `dist_share/`.
 
 ## Credits
 
-**Created by Ivan Cayon** ([@ivancayonh](https://github.com/ivancayonh))
+**Created by Ivan Cayon** ([@icayon]((https://github.com/Icayon]))
 
 Binary `.ymt` compilation powered by [CodeWalker.Core](https://github.com/dexyfex/CodeWalker) by dexyfex.
 
