@@ -1,0 +1,22 @@
+# Build output
+YMTCreator/bin/
+YMTCreator/obj/
+dist/
+dist_share/
+
+# IDE
+.vs/
+*.user
+*.suo
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Release zips
+*.zip
+
+# Logs
+*.log
