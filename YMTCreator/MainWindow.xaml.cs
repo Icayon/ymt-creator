@@ -16,21 +16,86 @@ public partial class MainWindow : Window
 
     private ScanResult? _scan;
     private string?     _lastXml;
+    private bool        _folderSelected;
 
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        UpdateLangButtons();
+    }
+
+    // ── Language toggle ───────────────────────────────────────────────────────
+    private void BtnLangEs_Click(object sender, RoutedEventArgs e)
+    {
+        Lang.IsEnglish = false;
+        ApplyLanguage();
+    }
+
+    private void BtnLangEn_Click(object sender, RoutedEventArgs e)
+    {
+        Lang.IsEnglish = true;
+        ApplyLanguage();
+    }
+
+    private void ApplyLanguage()
+    {
+        Title                    = Lang.WindowTitle;
+        TxtHeaderTitle.Text      = Lang.HeaderTitle;
+        TxtHeaderSub.Text        = Lang.HeaderSub;
+        TxtFolderLabel.Text      = Lang.FolderLabel;
+        TxtDlcLabel.Text         = Lang.DlcLabel;
+        TxtDlcName.ToolTip       = Lang.DlcTooltip;
+        TxtTreeHeader.Text       = Lang.TreeHeader;
+        BtnExpandAll.ToolTip     = Lang.ExpandAll;
+        BtnCollapseAll.ToolTip   = Lang.CollapseAll;
+        TxtXmlHeader.Text        = Lang.XmlHeader;
+        BtnBrowse.Content        = Lang.BtnBrowseText;
+        BtnScan.Content          = Lang.BtnScanText;
+        BtnGenerate.Content      = Lang.BtnGenerateText;
+        BtnSave.Content          = Lang.BtnSaveText;
+        BtnCopy.Content          = Lang.BtnCopyText;
+
+        if (!_folderSelected)
+            TxtFolder.Text = Lang.FolderHint;
+
+        SetStatus(Lang.StatusReady);
+        UpdateLangButtons();
+
+        if (_scan is not null)
+        {
+            BuildTree(_scan);
+            UpdateStats();
+        }
+    }
+
+    private void UpdateLangButtons()
+    {
+        var activeBg   = new SolidColorBrush(Color.FromRgb(0x1a, 0x1a, 0x1a));
+        var inactiveBg = new SolidColorBrush(Colors.Transparent);
+        var activeFg   = Brushes.White;
+        var inactiveFg = new SolidColorBrush(Color.FromRgb(0x44, 0x29, 0x00));
+
+        BtnLangEs.Background = !Lang.IsEnglish ? activeBg   : inactiveBg;
+        BtnLangEs.Foreground = !Lang.IsEnglish ? activeFg   : inactiveFg;
+        BtnLangEn.Background =  Lang.IsEnglish ? activeBg   : inactiveBg;
+        BtnLangEn.Foreground =  Lang.IsEnglish ? activeFg   : inactiveFg;
+    }
 
     // ── Folder browser ────────────────────────────────────────────────────────
     private void BtnBrowse_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFolderDialog
         {
-            Title = "Selecciona la carpeta con los .ydd y .ytd de la ped"
+            Title = Lang.IsEnglish
+                ? "Select the folder containing your ped's .ydd and .ytd files"
+                : "Selecciona la carpeta con los .ydd y .ytd de la ped"
         };
         if (dlg.ShowDialog() != true) return;
 
-        TxtFolder.Text = dlg.FolderName;
+        TxtFolder.Text   = dlg.FolderName;
+        _folderSelected  = true;
         BtnScan.IsEnabled = true;
-        SetStatus("Carpeta seleccionada. Pulsa 'Escanear' para detectar prendas.");
+        SetStatus(Lang.StatusFolderSelected);
     }
 
     // ── Scan ─────────────────────────────────────────────────────────────────
@@ -39,7 +104,7 @@ public partial class MainWindow : Window
         var folder = TxtFolder.Text.Trim();
         if (!Directory.Exists(folder))
         {
-            SetStatus("❌ La carpeta no existe.", error: true);
+            SetStatus(Lang.ErrFolderNotFound, error: true);
             return;
         }
 
@@ -52,16 +117,16 @@ public partial class MainWindow : Window
             _lastXml              = null;
             TxtXml.Text           = "";
 
-            SetStatus(
-                $"✔ Escaneado: {_scan.Components.Count} componentes, " +
-                $"{_scan.TotalDrawables} drawables, " +
-                $"{_scan.TotalTextures} texturas, " +
-                $"{_scan.TotalProps} props.");
+            SetStatus(Lang.StatusScanned(
+                _scan.Components.Count,
+                _scan.TotalDrawables,
+                _scan.TotalTextures,
+                _scan.TotalProps));
             UpdateStats();
         }
         catch (Exception ex)
         {
-            SetStatus($"❌ Error al escanear: {ex.Message}", error: true);
+            SetStatus(Lang.ErrScan(ex.Message), error: true);
         }
     }
 
@@ -74,14 +139,14 @@ public partial class MainWindow : Window
 
         try
         {
-            _lastXml      = _generator.Generate(_scan);
-            TxtXml.Text   = _lastXml;
+            _lastXml          = _generator.Generate(_scan);
+            TxtXml.Text       = _lastXml;
             BtnSave.IsEnabled = true;
-            SetStatus("✔ XML generado. Usa 'Guardar' para exportar el .ymt binario.");
+            SetStatus(Lang.StatusGenerated);
         }
         catch (Exception ex)
         {
-            SetStatus($"❌ Error al generar XML: {ex.Message}", error: true);
+            SetStatus(Lang.ErrGenerate(ex.Message), error: true);
         }
     }
 
@@ -93,7 +158,7 @@ public partial class MainWindow : Window
         var suggestedName = Path.GetFileName(TxtFolder.Text.TrimEnd('\\', '/'));
         var dlg = new SaveFileDialog
         {
-            Title            = "Guardar YMT",
+            Title            = Lang.SaveDialogTitle,
             FileName         = $"{suggestedName}.ymt",
             Filter           = "YMT Binary (*.ymt)|*.ymt|YMT XML (*.ymt.xml)|*.ymt.xml|All Files (*.*)|*.*",
             InitialDirectory = TxtFolder.Text
@@ -105,20 +170,18 @@ public partial class MainWindow : Window
         {
             if (dlg.FilterIndex == 1)
             {
-                // Binary .ymt via CodeWalker
                 YmtBinaryWriter.Save(_lastXml, dlg.FileName);
-                SetStatus($"✔ Guardado como binario .ymt: {dlg.FileName}");
+                SetStatus(Lang.StatusSavedBinary(dlg.FileName));
             }
             else
             {
-                // Fallback: save as XML
                 File.WriteAllText(dlg.FileName, _lastXml, System.Text.Encoding.UTF8);
-                SetStatus($"✔ Guardado como XML: {dlg.FileName}");
+                SetStatus(Lang.StatusSavedXml(dlg.FileName));
             }
         }
         catch (Exception ex)
         {
-            SetStatus($"❌ Error al guardar: {ex.Message}", error: true);
+            SetStatus(Lang.ErrSave(ex.Message), error: true);
         }
     }
 
@@ -128,7 +191,7 @@ public partial class MainWindow : Window
         if (!string.IsNullOrEmpty(TxtXml.Text))
         {
             Clipboard.SetText(TxtXml.Text);
-            SetStatus("✔ XML copiado al portapapeles.");
+            SetStatus(Lang.StatusCopied);
         }
     }
 
@@ -154,7 +217,7 @@ public partial class MainWindow : Window
         // ── Components ────────────────────────────────────────────────────────
         if (scan.Components.Count > 0)
         {
-            var compHeader = MakeHeaderItem("COMPONENTES  (" + scan.Components.Count + ")", "#F7B731");
+            var compHeader = MakeHeaderItem(Lang.TreeComponents(scan.Components.Count), "#F7B731");
             compHeader.IsExpanded = true;
 
             foreach (var comp in scan.Components)
@@ -186,13 +249,13 @@ public partial class MainWindow : Window
                 .GroupBy(p => p.Anchor)
                 .OrderBy(g => (int)g.Key);
 
-            var propHeader = MakeHeaderItem("PROPS  (" + scan.Props.Count + ")", "#F7B731");
+            var propHeader = MakeHeaderItem(Lang.TreeProps(scan.Props.Count), "#F7B731");
             propHeader.IsExpanded = true;
 
             foreach (var group in propsByAnchor)
             {
                 var anchorItem = MakeLabelItem(
-                    $"ANCHOR_{group.Key.ToString().ToUpper()}  ({group.Count()} prop(s))",
+                    Lang.TreeAnchor(group.Key.ToString().ToUpper(), group.Count()),
                     "#ffdd99");
                 anchorItem.IsExpanded = false;
 
@@ -216,7 +279,7 @@ public partial class MainWindow : Window
         if (scan.Components.Count == 0 && scan.Props.Count == 0)
         {
             var empty = new TreeViewItem();
-            empty.Header = MakeText("No se encontraron archivos .ydd / .ytd en la carpeta.", "#888");
+            empty.Header = MakeText(Lang.TreeEmpty, "#888");
             PedTree.Items.Add(empty);
         }
     }
@@ -293,10 +356,10 @@ public partial class MainWindow : Window
     private void UpdateStats()
     {
         if (_scan is null) { TxtStats.Text = ""; return; }
-        TxtStats.Text =
-            $"Components: {_scan.Components.Count}  |  " +
-            $"Drawables: {_scan.TotalDrawables}  |  " +
-            $"Textures: {_scan.TotalTextures}  |  " +
-            $"Props: {_scan.TotalProps}";
+        TxtStats.Text = Lang.Stats(
+            _scan.Components.Count,
+            _scan.TotalDrawables,
+            _scan.TotalTextures,
+            _scan.TotalProps);
     }
 }

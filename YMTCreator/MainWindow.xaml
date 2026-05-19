@@ -59,6 +59,26 @@
             </Style.Triggers>
         </Style>
 
+        <!-- ── Language button style ────────────────────────────────────────── -->
+        <Style x:Key="LangBtn" TargetType="Button">
+            <Setter Property="Width"          Value="30"/>
+            <Setter Property="Height"         Value="22"/>
+            <Setter Property="FontSize"       Value="11"/>
+            <Setter Property="FontWeight"     Value="Bold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor"         Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- ── TextBox style ────────────────────────────────────────────────── -->
         <Style x:Key="TxtDark" TargetType="TextBox">
             <Setter Property="Background"        Value="{StaticResource Bg2}"/>
@@ -185,15 +205,29 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="■  YMT CREADOR — GTA V PED CLOTHING"
+                <TextBlock x:Name="TxtHeaderTitle"
+                           Text="■  YMT CREADOR — GTA V PED CLOTHING"
                            FontWeight="Bold" FontSize="15"
                            Foreground="#1a1a1a"
                            VerticalAlignment="Center" Margin="16,0"/>
-                <TextBlock Grid.Column="1"
-                           Text="Genera el .ymt.xml para CodeWalker"
+                <TextBlock x:Name="TxtHeaderSub"
+                           Grid.Column="1"
+                           Text="Genera el .ymt para peds addon de GTA V"
                            Foreground="#55290000"
-                           FontSize="11" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                           FontSize="11" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <!-- Language toggle -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal"
+                            VerticalAlignment="Center" Margin="0,0,12,0">
+                    <Button x:Name="BtnLangEs" Content="ES"
+                            Style="{StaticResource LangBtn}"
+                            Click="BtnLangEs_Click"/>
+                    <Button x:Name="BtnLangEn" Content="EN"
+                            Style="{StaticResource LangBtn}"
+                            Margin="3,0,0,0"
+                            Click="BtnLangEn_Click"/>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -213,13 +247,15 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="Carpeta:" VerticalAlignment="Center"
+                <TextBlock x:Name="TxtFolderLabel"
+                           Grid.Column="0" Text="Carpeta:" VerticalAlignment="Center"
                            Foreground="{StaticResource TextSub}" Margin="0,0,8,0"/>
                 <TextBox   Grid.Column="1" x:Name="TxtFolder"
                            Style="{StaticResource TxtDark}"
                            VerticalAlignment="Center" IsReadOnly="True"
                            Text="(selecciona una carpeta con .ydd y .ytd)"/>
-                <Button    Grid.Column="2" Content="📁  Abrir carpeta"
+                <Button    Grid.Column="2" x:Name="BtnBrowse"
+                           Content="📁  Abrir carpeta"
                            Style="{StaticResource BtnSecondary}"
                            VerticalAlignment="Center" Margin="8,0,0,0"
                            Click="BtnBrowse_Click"/>
@@ -230,7 +266,8 @@
                            IsEnabled="False"
                            Click="BtnScan_Click"/>
 
-                <TextBlock Grid.Column="5" Text="DLC name:" VerticalAlignment="Center"
+                <TextBlock x:Name="TxtDlcLabel"
+                           Grid.Column="5" Text="DLC name:" VerticalAlignment="Center"
                            Foreground="{StaticResource TextSub}" Margin="0,0,8,0"/>
                 <TextBox   Grid.Column="6" x:Name="TxtDlcName"
                            Style="{StaticResource TxtDark}"
@@ -265,15 +302,18 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="PRENDAS DETECTADAS"
+                        <TextBlock x:Name="TxtTreeHeader"
+                                   Text="PRENDAS DETECTADAS"
                                    FontWeight="SemiBold" FontSize="11"
                                    Foreground="{StaticResource Accent}"
                                    VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Content="+" Style="{StaticResource BtnSecondary}"
+                            <Button x:Name="BtnExpandAll"
+                                    Content="+" Style="{StaticResource BtnSecondary}"
                                     FontSize="15" Padding="6,2" Margin="0,0,4,0"
                                     ToolTip="Expandir todo" Click="BtnExpandAll_Click"/>
-                            <Button Content="−" Style="{StaticResource BtnSecondary}"
+                            <Button x:Name="BtnCollapseAll"
+                                    Content="−" Style="{StaticResource BtnSecondary}"
                                     FontSize="15" Padding="6,2"
                                     ToolTip="Colapsar todo" Click="BtnCollapseAll_Click"/>
                         </StackPanel>
@@ -308,7 +348,8 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="PREVISUALIZACIÓN XML  (listo para CodeWalker)"
+                        <TextBlock x:Name="TxtXmlHeader"
+                                   Text="PREVISUALIZACIÓN XML  (listo para CodeWalker)"
                                    FontWeight="SemiBold" FontSize="11"
                                    Foreground="{StaticResource Accent}"
                                    VerticalAlignment="Center"/>
@@ -323,7 +364,8 @@
                                     Style="{StaticResource BtnSecondary}"
                                     IsEnabled="False" Margin="0,0,6,0"
                                     Click="BtnSave_Click"/>
-                            <Button Content="📋  Copiar"
+                            <Button x:Name="BtnCopy"
+                                    Content="📋  Copiar"
                                     Style="{StaticResource BtnSecondary}"
                                     Click="BtnCopy_Click"/>
                         </StackPanel>
