@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish
+        run: >
+          dotnet publish YMTCreator/YMTCreator.csproj
+          -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=none
+          -o dist_share
+
+      - name: Upload unsigned artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: YMTCreator-unsigned
+          path: dist_share/YMTCreator.exe
+
+      - name: Sign with SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token:                    ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id:              ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug:                 ymt-creator
+          signing-policy-slug:          release-signing
+          artifact-configuration-slug:  exe
+          github-artifact-id:           ${{ steps.upload.outputs.artifact-id }}
+          wait-for-completion:          true
+          output-artifact-directory:    dist_signed
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "dist_zip\YMTCreatos" -Force | Out-Null
+          Copy-Item "dist_signed\YMTCreator.exe" "dist_zip\YMTCreatos\YMTCreator.exe"
+          Compress-Archive -Path "dist_zip\YMTCreatos" -DestinationPath "YMTCreator.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: YMTCreator.zip
+          name: "YMT Creator ${{ github.ref_name }}"
+          body: |
+            ## YMT Creator ${{ github.ref_name }}
+
+            Download **YMTCreator.zip** below, extract and run `YMTCreatos\YMTCreator.exe` — no installation required. Bundles .NET 8 and CodeWalker.Core internally.
+
+            ### Languages
+            Use the **ES / EN** buttons in the top-right corner to switch between Spanish and English.
