@@ -7,6 +7,9 @@ public class PedPropDrawable
     public bool       HasAlpha        { get; set; }
     public int        NumAlternatives { get; set; }
 
+    public string? SourcePath { get; set; }
+    public Dictionary<int, string> AltSourcePaths { get; set; } = [];
+
     public List<PedPropTexture> Textures { get; set; } = [];
 
     public string IndexStr    => Index.ToString("D3");

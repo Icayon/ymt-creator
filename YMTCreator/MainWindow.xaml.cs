@@ -11,12 +11,16 @@ namespace YMTCreator;
 
 public partial class MainWindow : Window
 {
-    private readonly PedFileScanner  _scanner   = new();
-    private readonly YmtXmlGenerator _generator = new();
+    private readonly PedFileScanner   _scanner   = new();
+    private readonly YmtXmlGenerator  _generator = new();
+    private readonly PedFileOrganizer _organizer = new();
 
     private ScanResult? _scan;
     private string?     _lastXml;
     private bool        _folderSelected;
+
+    private List<FileMapping>? _orgMappings;
+    private ScanResult?        _orgRenamedScan;
 
     public MainWindow()
     {
@@ -25,17 +29,8 @@ public partial class MainWindow : Window
     }
 
     // ── Language toggle ───────────────────────────────────────────────────────
-    private void BtnLangEs_Click(object sender, RoutedEventArgs e)
-    {
-        Lang.IsEnglish = false;
-        ApplyLanguage();
-    }
-
-    private void BtnLangEn_Click(object sender, RoutedEventArgs e)
-    {
-        Lang.IsEnglish = true;
-        ApplyLanguage();
-    }
+    private void BtnLangEs_Click(object sender, RoutedEventArgs e) { Lang.IsEnglish = false; ApplyLanguage(); }
+    private void BtnLangEn_Click(object sender, RoutedEventArgs e) { Lang.IsEnglish = true;  ApplyLanguage(); }
 
     private void ApplyLanguage()
     {
@@ -55,10 +50,24 @@ public partial class MainWindow : Window
         BtnSave.Content          = Lang.BtnSaveText;
         BtnCopy.Content          = Lang.BtnCopyText;
 
+        // Organizer tab
+        TxtTabGen.Text           = Lang.TabGenerator;
+        TxtTabOrg.Text           = Lang.TabOrganizer;
+        TxtOrgInfo.Text          = Lang.OrgInfo;
+        TxtOrgPedLabel.Text      = Lang.OrgPedName;
+        TxtOrgOutputLabel.Text   = Lang.OrgOutputFolder;
+        BtnOrgBrowse.Content     = Lang.OrgBrowseOutput;
+        BtnOrgPreview.Content    = Lang.OrgPreview;
+        BtnOrgCopy.Content       = Lang.OrgCopy;
+        BtnOrgGenerateYmt.Content = Lang.OrgGenerateYmt;
+        ColOldName.Header        = Lang.OrgColOldName;
+        ColNewName.Header        = Lang.OrgColNewName;
+
         if (!_folderSelected)
             TxtFolder.Text = Lang.FolderHint;
 
         SetStatus(Lang.StatusReady);
+        SetOrgStatus(_scan is null ? Lang.OrgNeedScan : Lang.OrgPreviewDone(_orgMappings?.Count ?? 0));
         UpdateLangButtons();
 
         if (_scan is not null)
@@ -111,6 +120,12 @@ public partial class MainWindow : Window
         try
         {
             _scan = _scanner.Scan(folder);
+            _orgMappings    = null;
+            _orgRenamedScan = null;
+            OrgGrid.ItemsSource      = null;
+            BtnOrgCopy.IsEnabled     = false;
+            BtnOrgGenerateYmt.IsEnabled = false;
+
             BuildTree(_scan);
             BtnGenerate.IsEnabled = true;
             BtnSave.IsEnabled     = false;
@@ -122,6 +137,7 @@ public partial class MainWindow : Window
                 _scan.TotalDrawables,
                 _scan.TotalTextures,
                 _scan.TotalProps));
+            SetOrgStatus(Lang.OrgNeedPedName);
             UpdateStats();
         }
         catch (Exception ex)
@@ -130,11 +146,10 @@ public partial class MainWindow : Window
         }
     }
 
-    // ── Generate XML ─────────────────────────────────────────────────────────
+    // ── Generate XML (Tab 1) ─────────────────────────────────────────────────
     private void BtnGenerate_Click(object sender, RoutedEventArgs e)
     {
         if (_scan is null) return;
-
         _scan.DlcName = TxtDlcName.Text.Trim();
 
         try
@@ -150,7 +165,7 @@ public partial class MainWindow : Window
         }
     }
 
-    // ── Save ─────────────────────────────────────────────────────────────────
+    // ── Save (Tab 1) ─────────────────────────────────────────────────────────
     private void BtnSave_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_lastXml)) return;
@@ -163,7 +178,6 @@ public partial class MainWindow : Window
             Filter           = "YMT Binary (*.ymt)|*.ymt|YMT XML (*.ymt.xml)|*.ymt.xml|All Files (*.*)|*.*",
             InitialDirectory = TxtFolder.Text
         };
-
         if (dlg.ShowDialog() != true) return;
 
         try
@@ -209,12 +223,108 @@ public partial class MainWindow : Window
         }
     }
 
+    // ── Organizer: browse output folder ──────────────────────────────────────
+    private void BtnOrgBrowse_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFolderDialog
+        {
+            Title = Lang.IsEnglish ? "Select output folder" : "Selecciona la carpeta de destino"
+        };
+        if (dlg.ShowDialog() != true) return;
+        TxtOrgOutputFolder.Text = dlg.FolderName;
+    }
+
+    // ── Organizer: preview ────────────────────────────────────────────────────
+    private void BtnOrgPreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ValidateOrganizer(out var pedName, out var outputFolder)) return;
+
+        _orgMappings = _organizer.BuildMappings(_scan!, pedName);
+        OrgGrid.ItemsSource = _orgMappings;
+        BtnOrgCopy.IsEnabled = _orgMappings.Count > 0;
+        SetOrgStatus(Lang.OrgPreviewDone(_orgMappings.Count));
+    }
+
+    // ── Organizer: copy & rename ──────────────────────────────────────────────
+    private void BtnOrgCopy_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ValidateOrganizer(out var pedName, out var outputFolder)) return;
+        if (_orgMappings is null || _orgMappings.Count == 0)
+        {
+            _orgMappings = _organizer.BuildMappings(_scan!, pedName);
+            OrgGrid.ItemsSource = _orgMappings;
+        }
+
+        try
+        {
+            var copied = _organizer.CopyFiles(_orgMappings, outputFolder);
+            _orgRenamedScan = _organizer.BuildRenamedScan(_scan!, pedName, outputFolder);
+            BtnOrgGenerateYmt.IsEnabled = true;
+            SetOrgStatus(Lang.OrgCopyDone(copied));
+        }
+        catch (Exception ex)
+        {
+            SetOrgStatus(Lang.OrgErrCopy(ex.Message), error: true);
+        }
+    }
+
+    // ── Organizer: generate YMT ───────────────────────────────────────────────
+    private void BtnOrgGenerateYmt_Click(object sender, RoutedEventArgs e)
+    {
+        if (_orgRenamedScan is null) return;
+
+        var pedName      = TxtOrgPedName.Text.Trim();
+        var outputFolder = TxtOrgOutputFolder.Text.Trim();
+        _orgRenamedScan.DlcName = TxtDlcName.Text.Trim();
+
+        try
+        {
+            var xml  = _generator.Generate(_orgRenamedScan);
+            var path = Path.Combine(outputFolder, $"{pedName}.ymt");
+            YmtBinaryWriter.Save(xml, path);
+            SetOrgStatus(Lang.OrgYmtSaved(path));
+        }
+        catch (Exception ex)
+        {
+            SetOrgStatus(Lang.OrgErrCopy(ex.Message), error: true);
+        }
+    }
+
+    // ── Organizer validation ──────────────────────────────────────────────────
+    private bool ValidateOrganizer(out string pedName, out string outputFolder)
+    {
+        pedName      = TxtOrgPedName.Text.Trim();
+        outputFolder = TxtOrgOutputFolder.Text.Trim();
+
+        if (_scan is null)
+        {
+            SetOrgStatus(Lang.OrgNeedScan, error: true);
+            return false;
+        }
+        if (string.IsNullOrEmpty(pedName))
+        {
+            SetOrgStatus(Lang.OrgNeedPedName, error: true);
+            return false;
+        }
+        if (string.IsNullOrEmpty(outputFolder))
+        {
+            SetOrgStatus(Lang.OrgNeedOutput, error: true);
+            return false;
+        }
+        if (Path.GetFullPath(outputFolder).Equals(
+            Path.GetFullPath(_scan.FolderPath), StringComparison.OrdinalIgnoreCase))
+        {
+            SetOrgStatus(Lang.OrgSameFolder, error: true);
+            return false;
+        }
+        return true;
+    }
+
     // ── Build TreeView ────────────────────────────────────────────────────────
     private void BuildTree(ScanResult scan)
     {
         PedTree.Items.Clear();
 
-        // ── Components ────────────────────────────────────────────────────────
         if (scan.Components.Count > 0)
         {
             var compHeader = MakeHeaderItem(Lang.TreeComponents(scan.Components.Count), "#F7B731");
@@ -229,50 +339,37 @@ public partial class MainWindow : Window
                 {
                     var drawItem = MakeLabelItem(drawable.DisplayName, "#aaddff");
                     drawItem.IsExpanded = false;
-
                     foreach (var tex in drawable.Textures)
                         drawItem.Items.Add(MakeLabelItem(tex.DisplayName, "#99bbdd"));
-
                     compItem.Items.Add(drawItem);
                 }
 
                 compHeader.Items.Add(compItem);
             }
-
             PedTree.Items.Add(compHeader);
         }
 
-        // ── Props ─────────────────────────────────────────────────────────────
         if (scan.Props.Count > 0)
         {
-            var propsByAnchor = scan.Props
-                .GroupBy(p => p.Anchor)
-                .OrderBy(g => (int)g.Key);
-
             var propHeader = MakeHeaderItem(Lang.TreeProps(scan.Props.Count), "#F7B731");
             propHeader.IsExpanded = true;
 
-            foreach (var group in propsByAnchor)
+            foreach (var group in scan.Props.GroupBy(p => p.Anchor).OrderBy(g => (int)g.Key))
             {
                 var anchorItem = MakeLabelItem(
-                    Lang.TreeAnchor(group.Key.ToString().ToUpper(), group.Count()),
-                    "#ffdd99");
+                    Lang.TreeAnchor(group.Key.ToString().ToUpper(), group.Count()), "#ffdd99");
                 anchorItem.IsExpanded = false;
 
                 foreach (var prop in group)
                 {
                     var propItem = MakeLabelItem(prop.DisplayName, "#aaddff");
                     propItem.IsExpanded = false;
-
                     foreach (var tex in prop.Textures)
                         propItem.Items.Add(MakeLabelItem(tex.DisplayName, "#99bbdd"));
-
                     anchorItem.Items.Add(propItem);
                 }
-
                 propHeader.Items.Add(anchorItem);
             }
-
             PedTree.Items.Add(propHeader);
         }
 
@@ -299,8 +396,7 @@ public partial class MainWindow : Window
         return item;
     }
 
-    private static TreeViewItem MakeCheckItem(string text, PedComponent comp,
-        RoutedEventHandler handler)
+    private static TreeViewItem MakeCheckItem(string text, PedComponent comp, RoutedEventHandler handler)
     {
         var chk = new CheckBox
         {
@@ -308,24 +404,19 @@ public partial class MainWindow : Window
             Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8e8e8")),
             Tag        = comp
         };
-
         var tb = new TextBlock
         {
-            Text       = text,
-            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8e8e8")),
-            Margin     = new Thickness(4, 0, 0, 0),
+            Text              = text,
+            Foreground        = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8e8e8")),
+            Margin            = new Thickness(4, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center
         };
-
         var sp = new StackPanel { Orientation = Orientation.Horizontal };
         sp.Children.Add(chk);
         sp.Children.Add(tb);
-
         chk.Checked   += handler;
         chk.Unchecked += handler;
-
-        var item = new TreeViewItem { Header = sp };
-        return item;
+        return new TreeViewItem { Header = sp };
     }
 
     private static TextBlock MakeText(string text, string hex, bool bold = false, double size = 13) =>
@@ -337,7 +428,6 @@ public partial class MainWindow : Window
             FontSize   = size
         };
 
-    // ── Checkbox toggle handler ───────────────────────────────────────────────
     private void comp_CheckChanged(object sender, RoutedEventArgs e)
     {
         if (sender is CheckBox chk && chk.Tag is PedComponent comp)
@@ -349,6 +439,14 @@ public partial class MainWindow : Window
     {
         TxtStatus.Text       = msg;
         TxtStatus.Foreground = error
+            ? new SolidColorBrush(Colors.Tomato)
+            : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888888"));
+    }
+
+    private void SetOrgStatus(string msg, bool error = false)
+    {
+        TxtOrgStatus.Text       = msg;
+        TxtOrgStatus.Foreground = error
             ? new SolidColorBrush(Colors.Tomato)
             : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888888"));
     }

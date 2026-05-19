@@ -87,4 +87,30 @@ public static class Lang
     public static string WindowTitle => IsEnglish
         ? "YMT Creator — GTA V  |  by @ivancayonh"
         : "YMT Creador — GTA V  |  by @ivancayonh";
+
+    // ── Organizer tab ────────────────────────────────────────────────────────
+    public static string TabGenerator  => IsEnglish ? "YMT Generator"  : "Generador YMT";
+    public static string TabOrganizer  => IsEnglish ? "File Organizer" : "Organizador";
+
+    public static string OrgPedName       => IsEnglish ? "New ped name:"    : "Nombre de la ped:";
+    public static string OrgPedNameHint   => IsEnglish ? "e.g. mynewped"    : "ej. mynewped";
+    public static string OrgOutputFolder  => IsEnglish ? "Output folder:"   : "Carpeta destino:";
+    public static string OrgBrowseOutput  => IsEnglish ? "📁  Select"       : "📁  Seleccionar";
+    public static string OrgPreview       => IsEnglish ? "🔍  Preview"      : "🔍  Vista previa";
+    public static string OrgCopy          => IsEnglish ? "📋  Copy & Rename files" : "📋  Copiar y renombrar";
+    public static string OrgGenerateYmt   => IsEnglish ? "⚙  Generate YMT" : "⚙  Generar YMT";
+    public static string OrgColOldName    => IsEnglish ? "Original file"    : "Archivo original";
+    public static string OrgColNewName    => IsEnglish ? "New name"         : "Nuevo nombre";
+    public static string OrgInfo          => IsEnglish
+        ? "Scan a folder with clothing from mixed packs. The tool matches each drawable with its textures and renumbers them sequentially. Enter a ped name, select an output folder and click Copy & Rename."
+        : "Escanea una carpeta con ropa de distintos packs. La herramienta empareja cada drawable con sus texturas y los renumera secuencialmente. Introduce el nombre de la ped, selecciona la carpeta destino y pulsa Copiar y renombrar.";
+
+    public static string OrgNeedScan     => IsEnglish ? "Scan a folder first (use the toolbar above)." : "Primero escanea una carpeta (usa la barra de herramientas).";
+    public static string OrgNeedPedName  => IsEnglish ? "Enter a ped name." : "Introduce el nombre de la ped.";
+    public static string OrgNeedOutput   => IsEnglish ? "Select an output folder." : "Selecciona la carpeta destino.";
+    public static string OrgSameFolder   => IsEnglish ? "Output folder cannot be the same as the source folder." : "La carpeta destino no puede ser la misma que la de origen.";
+    public static string OrgPreviewDone(int n) => IsEnglish ? $"Preview: {n} files will be renamed." : $"Vista previa: se renombrarán {n} archivos.";
+    public static string OrgCopyDone(int n)    => IsEnglish ? $"✔ Done! {n} files copied and renamed." : $"✔ Completado. {n} archivos copiados y renombrados.";
+    public static string OrgErrCopy(string m)  => IsEnglish ? $"❌ Copy error: {m}" : $"❌ Error al copiar: {m}";
+    public static string OrgYmtSaved(string p) => IsEnglish ? $"✔ YMT saved: {p}" : $"✔ YMT guardado: {p}";
 }

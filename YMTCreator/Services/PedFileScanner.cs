@@ -29,31 +29,25 @@ public class PedFileScanner
     };
 
     // ─── Optional ped-name prefix pattern: "pedname^" ────────────────────────
-    // Matches any characters that are NOT a caret, followed by a caret.
     private const string Pfx = @"(?:[^^]+\^)?";
 
     // ─── Regexes ───────────────────────────────────────────────────────────────
-    // [pedname^]component_index_u|r[_altNumber].ydd
     private static readonly Regex RxCompDrawable = new(
         $@"^{Pfx}(head|berd|hair|uppr|lowr|hand|feet|teef|accs|task|decl|jbib)_(\d{{3}})_(u|r)(?:_(\d+))?\.ydd$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // [pedname^]component_diff_index_letter_tone.ytd
     private static readonly Regex RxCompTexture = new(
         $@"^{Pfx}(head|berd|hair|uppr|lowr|hand|feet|teef|accs|task|decl|jbib)_diff_(\d{{3}})_([a-z])_(uni|whi|bla|chi|lat|ara|bal|jam|kor|ita|pak)\.ytd$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // [pedname^]p_type_index[_altNumber].ydd
     private static readonly Regex RxPropDrawable = new(
         $@"^{Pfx}p_(head|eyes|ears|mouth|lwrist|rwrist)_(\d{{3}})(?:_(\d+))?\.ydd$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // [pedname^]p_type_diff_index_letter_tone.ytd
     private static readonly Regex RxPropTexture = new(
         $@"^{Pfx}p_(head|eyes|ears|mouth|lwrist|rwrist)_diff_(\d{{3}})_([a-z])_(uni|whi|bla|chi|lat|ara|bal|jam|kor|ita|pak)\.ytd$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // [pedname^]component_index_u|r.yld
     private static readonly Regex RxCloth = new(
         $@"^{Pfx}(head|berd|hair|uppr|lowr|hand|feet|teef|accs|task|decl|jbib)_(\d{{3}})_(u|r)\.yld$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -63,11 +57,10 @@ public class PedFileScanner
     {
         var result = new ScanResult { FolderPath = folderPath };
 
+        // Keep full paths; use filename for matching
         var files = Directory
             .GetFiles(folderPath, "*", SearchOption.AllDirectories)
-            .Select(Path.GetFileName)
-            .Where(f => f != null)
-            .Select(f => f!)
+            .Select(p => (fullPath: p, name: Path.GetFileName(p)))
             .ToList();
 
         ScanComponents(files, result);
@@ -78,14 +71,14 @@ public class PedFileScanner
     }
 
     // ─── Components ────────────────────────────────────────────────────────────
-    private static void ScanComponents(List<string> files, ScanResult result)
+    private static void ScanComponents(List<(string fullPath, string name)> files, ScanResult result)
     {
         var map = new Dictionary<ComponentSlot, Dictionary<int, PedDrawable>>();
 
         // Pass 1 – drawables (.ydd)
-        foreach (var file in files)
+        foreach (var (fullPath, name) in files)
         {
-            var m = RxCompDrawable.Match(file);
+            var m = RxCompDrawable.Match(name);
             if (!m.Success) continue;
 
             var compName = m.Groups[1].Value.ToLower();
@@ -99,16 +92,23 @@ public class PedFileScanner
                 map[slot] = slotMap = [];
 
             if (!slotMap.TryGetValue(index, out var drawable))
-                slotMap[index] = drawable = new PedDrawable { Index = index, IsUniversal = isUniv };
+            {
+                drawable = new PedDrawable { Index = index, IsUniversal = isUniv, SourcePath = fullPath };
+                slotMap[index] = drawable;
+            }
 
             if (!string.IsNullOrEmpty(altStr))
-                drawable.NumAlternatives = Math.Max(drawable.NumAlternatives, int.Parse(altStr));
+            {
+                var altNum = int.Parse(altStr);
+                drawable.NumAlternatives = Math.Max(drawable.NumAlternatives, altNum);
+                drawable.AltSourcePaths.TryAdd(altNum, fullPath);
+            }
         }
 
         // Pass 2 – textures (.ytd)
-        foreach (var file in files)
+        foreach (var (fullPath, name) in files)
         {
-            var m = RxCompTexture.Match(file);
+            var m = RxCompTexture.Match(name);
             if (!m.Success) continue;
 
             var compName = m.Groups[1].Value.ToLower();
@@ -124,9 +124,10 @@ public class PedFileScanner
 
             drawable.Textures.Add(new PedTexture
             {
-                Letter   = letter,
-                SkinTone = tone,
-                TexId    = ToneToId.GetValueOrDefault(tone, 0)
+                Letter     = letter,
+                SkinTone   = tone,
+                TexId      = ToneToId.GetValueOrDefault(tone, 0),
+                SourcePath = fullPath
             });
         }
 
@@ -142,14 +143,14 @@ public class PedFileScanner
     }
 
     // ─── Props ─────────────────────────────────────────────────────────────────
-    private static void ScanProps(List<string> files, ScanResult result)
+    private static void ScanProps(List<(string fullPath, string name)> files, ScanResult result)
     {
         var map = new Dictionary<(string, int), PedPropDrawable>();
 
         // Pass 1 – drawables (.ydd)
-        foreach (var file in files)
+        foreach (var (fullPath, name) in files)
         {
-            var m = RxPropDrawable.Match(file);
+            var m = RxPropDrawable.Match(name);
             if (!m.Success) continue;
 
             var propType = m.Groups[1].Value.ToLower();
@@ -160,16 +161,23 @@ public class PedFileScanner
             if (!PropDefs.TryGetValue(propType, out var def)) continue;
 
             if (!map.TryGetValue(key, out var prop))
-                map[key] = prop = new PedPropDrawable { Index = index, Anchor = def.anchor };
+            {
+                prop = new PedPropDrawable { Index = index, Anchor = def.anchor, SourcePath = fullPath };
+                map[key] = prop;
+            }
 
             if (!string.IsNullOrEmpty(altStr))
-                prop.NumAlternatives = Math.Max(prop.NumAlternatives, int.Parse(altStr));
+            {
+                var altNum = int.Parse(altStr);
+                prop.NumAlternatives = Math.Max(prop.NumAlternatives, altNum);
+                prop.AltSourcePaths.TryAdd(altNum, fullPath);
+            }
         }
 
         // Pass 2 – textures (.ytd)
-        foreach (var file in files)
+        foreach (var (fullPath, name) in files)
         {
-            var m = RxPropTexture.Match(file);
+            var m = RxPropTexture.Match(name);
             if (!m.Success) continue;
 
             var propType = m.Groups[1].Value.ToLower();
@@ -185,9 +193,10 @@ public class PedFileScanner
 
             prop.Textures.Add(new PedPropTexture
             {
-                Letter   = letter,
-                SkinTone = tone,
-                TexId    = ToneToId.GetValueOrDefault(tone, 0)
+                Letter     = letter,
+                SkinTone   = tone,
+                TexId      = ToneToId.GetValueOrDefault(tone, 0),
+                SourcePath = fullPath
             });
         }
 
@@ -200,17 +209,16 @@ public class PedFileScanner
     }
 
     // ─── Cloth (.yld) ─────────────────────────────────────────────────────────
-    private static void CheckClothFiles(List<string> files, ScanResult result)
+    private static void CheckClothFiles(List<(string fullPath, string name)> files, ScanResult result)
     {
-        // Build set of (compName, index) pairs that have a .yld
-        var yldSet = new HashSet<(string comp, int index)>();
-        foreach (var file in files)
+        var yldMap = new Dictionary<(string comp, int index), string>();
+        foreach (var (fullPath, name) in files)
         {
-            var m = RxCloth.Match(file);
+            var m = RxCloth.Match(name);
             if (!m.Success) continue;
             var comp  = m.Groups[1].Value.ToLower();
             var index = int.Parse(m.Groups[2].Value);
-            yldSet.Add((comp, index));
+            yldMap[(comp, index)] = fullPath;
         }
 
         foreach (var comp in result.Components)
@@ -218,8 +226,11 @@ public class PedFileScanner
             var compName = comp.Slot.ToString().ToLower();
             foreach (var d in comp.Drawables)
             {
-                if (yldSet.Contains((compName, d.Index)))
-                    d.HasCloth = true;
+                if (yldMap.TryGetValue((compName, d.Index), out var yldPath))
+                {
+                    d.HasCloth        = true;
+                    d.ClothSourcePath = yldPath;
+                }
             }
         }
     }

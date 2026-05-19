@@ -7,6 +7,11 @@ public class PedDrawable
     public int  NumAlternatives { get; set; }
     public bool HasCloth        { get; set; }
 
+    // Full paths to source files (used by organizer)
+    public string? SourcePath      { get; set; }
+    public string? ClothSourcePath { get; set; }
+    public Dictionary<int, string> AltSourcePaths { get; set; } = [];
+
     public int    PropMask  => IsUniversal ? 1 : 17;
     public string IndexStr  => Index.ToString("D3");
     public string Suffix    => IsUniversal ? "_u" : "_r";
